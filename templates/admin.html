@@ -104,6 +104,23 @@
         </div>
       </div>
 
+      <div class="row mb-4">
+        <div class="col">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Reveal Results</h5>
+              <p class="card-text">
+                Ready to announce the winners? This will reveal the vote counts
+                to all participants.
+              </p>
+              <button id="reveal-winners" class="btn btn-success">
+                <i class="bi bi-trophy"></i> Reveal Winners
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="row">
         <div class="col">
           <button id="reset-votes" class="btn btn-danger">
@@ -153,6 +170,9 @@
         document
           .getElementById("reset-votes")
           .addEventListener("click", resetVotes);
+        document
+          .getElementById("reveal-winners")
+          .addEventListener("click", revealWinners);
       });
 
       function loadContestants() {
@@ -759,6 +779,118 @@
         statusEl.className = "badge bg-warning";
         statusEl.innerHTML =
           '<i class="bi bi-exclamation-triangle"></i> Connection Error';
+      });
+
+      // Add this function to admin.html
+      function revealWinners() {
+        if (
+          confirm(
+            "Are you sure you want to reveal the winners? This cannot be undone."
+          )
+        ) {
+          // Show loading state
+          const button = document.getElementById("reveal-winners");
+          const originalText = button.innerHTML;
+          button.disabled = true;
+          button.innerHTML =
+            '<span class="spinner-border spinner-border-sm"></span> Revealing...';
+
+          fetch("/reveal_winners", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            credentials: "same-origin",
+          })
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error(
+                  `Server returned ${response.status}: ${response.statusText}`
+                );
+              }
+              return response.json();
+            })
+            .then((data) => {
+              console.log("Winners revealed response:", data);
+              if (data.success) {
+                showNotification(
+                  "Winners revealed to all participants!",
+                  "success"
+                );
+                // Keep the button disabled and change its appearance
+                button.innerHTML =
+                  '<i class="bi bi-trophy"></i> Winners Revealed';
+                button.classList.remove("btn-success");
+                button.classList.add("btn-secondary");
+              } else {
+                showNotification(
+                  "Failed to reveal winners: " +
+                    (data.error || "Unknown error"),
+                  "danger"
+                );
+                // Re-enable the button
+                button.disabled = false;
+                button.innerHTML = originalText;
+              }
+            })
+            .catch((error) => {
+              console.error("Error revealing winners:", error);
+              showNotification("Error: " + error.message, "danger");
+              // Re-enable the button
+              button.disabled = false;
+              button.innerHTML = originalText;
+            });
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", function () {
+        // Connect reveal winners button
+        const revealWinnersBtn = document.getElementById("reveal-winners");
+        if (revealWinnersBtn) {
+          revealWinnersBtn.addEventListener("click", function () {
+            console.log("Revealing winners...");
+
+            // Show loading state
+            const button = this;
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML =
+              '<span class="spinner-border spinner-border-sm"></span> Revealing...';
+
+            fetch("/reveal_winners", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              credentials: "same-origin",
+            })
+              .then((response) => {
+                if (!response.ok) {
+                  throw new Error("Server returned " + response.status);
+                }
+                return response.json();
+              })
+              .then((data) => {
+                if (data.success) {
+                  showNotification("Winners revealed!", "success");
+                } else {
+                  showNotification(
+                    "Error: " + (data.error || "Unknown error"),
+                    "danger"
+                  );
+                }
+              })
+              .catch((error) => {
+                console.error("Error revealing winners:", error);
+                showNotification("Error: " + error.message, "danger");
+              })
+              .finally(() => {
+                // Restore button
+                button.disabled = false;
+                button.innerHTML = originalText;
+              });
+          });
+        }
       });
     </script>
   </body>

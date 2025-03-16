@@ -782,5 +782,58 @@ def remove_temp_voter():
         "votes": updated_votes
     })
 
+@app.route("/reveal_winners", methods=["POST"])
+@login_required
+def reveal_winners():
+    """Reveal winners to all participants."""
+    # Check if user is admin
+    if 'is_admin' not in session:
+        return jsonify({"success": False, "error": "Admin access required"}), 403
+    
+    try:
+        conn = sqlite3.connect('voting.db')
+        c = conn.cursor()
+        c.execute("SELECT option_name, total_votes FROM votes")
+        votes_raw = c.fetchall()
+        conn.close()
+        
+        # Convert to dictionary
+        votes = {name: count for name, count in votes_raw}
+        
+        if not votes:
+            return jsonify({"success": False, "error": "No votes recorded yet"}), 400
+            
+        # Sort by vote count (descending)
+        sorted_votes = sorted(votes.items(), key=lambda x: x[1], reverse=True)
+        
+        # Get winners (handle ties)
+        first_place_votes = sorted_votes[0][1]
+        first_place = [item[0] for item in sorted_votes if item[1] == first_place_votes]
+        
+        winners_data = {
+            "all_votes": votes,
+            "first_place": first_place,
+            "sorted_results": sorted_votes
+        }
+        
+        # If there are enough entries and votes, add second and third place
+        if len(sorted_votes) > 1 and sorted_votes[1][1] < first_place_votes:
+            second_place_votes = sorted_votes[1][1]
+            winners_data["second_place"] = [item[0] for item in sorted_votes 
+                                          if item[1] == second_place_votes]
+            
+            if len(sorted_votes) > 2 and sorted_votes[2][1] < second_place_votes:
+                third_place_votes = sorted_votes[2][1]
+                winners_data["third_place"] = [item[0] for item in sorted_votes 
+                                             if item[1] == third_place_votes]
+        
+        print("Emitting winners_revealed event with data:", winners_data)
+        socketio.emit("winners_revealed", winners_data)
+        
+        return jsonify({"success": True, "message": "Winners revealed successfully"})
+    except Exception as e:
+        print("Error revealing winners:", str(e))
+        return jsonify({"success": False, "error": str(e)}), 500
+
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)

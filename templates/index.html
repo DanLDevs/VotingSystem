@@ -305,6 +305,109 @@
         transform: translateY(-3px);
         box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
       }
+
+      .winners-announcement {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+        z-index: 9999;
+        text-align: center;
+        max-width: 90%;
+        animation: fadeIn 1s;
+      }
+
+      .winner {
+        margin: 20px 0;
+        padding: 15px;
+        border-radius: 10px;
+      }
+
+      .first-place {
+        background-color: rgba(255, 215, 0, 0.2);
+        border: 2px solid gold;
+      }
+
+      .second-place {
+        background-color: rgba(192, 192, 192, 0.2);
+        border: 2px solid silver;
+      }
+
+      .third-place {
+        background-color: rgba(205, 127, 50, 0.2);
+        border: 2px solid #cd7f32;
+      }
+
+      .medal {
+        font-size: 40px;
+        animation: pulse 2s infinite;
+      }
+
+      .winner-name {
+        font-size: 24px;
+        font-weight: bold;
+        margin: 10px 0;
+      }
+
+      .winner-votes {
+        font-size: 18px;
+      }
+
+      .winner-card {
+        transform: scale(1.05);
+        transition: all 0.3s;
+        z-index: 2;
+      }
+
+      .winner-countdown {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 30px 60px;
+        border-radius: 20px;
+        font-size: 30px;
+        z-index: 9999;
+        animation: pulse 1s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.1);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      @keyframes fadeIn {
+        0% {
+          opacity: 0;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      @keyframes slideIn {
+        0% {
+          transform: translateY(30px);
+          opacity: 0;
+        }
+        100% {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
     </style>
     <script>
       // Detect when app goes online/offline
@@ -674,6 +777,7 @@
 
             const card = document.createElement("div");
             card.className = "card";
+            card.dataset.option = option;
 
             const cardBody = document.createElement("div");
             cardBody.className = "card-body";
@@ -683,8 +787,11 @@
             title.textContent = option;
 
             const voteCount = document.createElement("p");
-            voteCount.className = "card-text";
-            voteCount.textContent = `Votes: ${count}`;
+            voteCount.className = "card-text vote-count";
+            // Hide actual vote count
+            voteCount.textContent = "Votes: ???";
+            // Store actual count as data attribute for reveal later
+            voteCount.dataset.count = count;
 
             cardBody.appendChild(title);
             cardBody.appendChild(voteCount);
@@ -837,94 +944,6 @@
           "warning"
         );
       });
-
-      socket.on("reconnect", function () {
-        showNotification("Reconnected!", "success");
-        // Refresh content
-        fetchVotes();
-      });
-
-      function showNotification(message, type = "info") {
-        // Create or update a notification div
-        let notification = document.getElementById("notification");
-        if (!notification) {
-          notification = document.createElement("div");
-          notification.id = "notification";
-          notification.className =
-            "toast-container position-fixed top-0 end-0 p-3";
-          document.body.appendChild(notification);
-        }
-
-        const toast = document.createElement("div");
-        toast.className = `toast show bg-${type}`;
-        toast.innerHTML = `
-          <div class="toast-header">
-            <strong class="me-auto">Voting System</strong>
-            <button type="button" class="btn-close" onclick="this.parentNode.parentNode.remove()"></button>
-          </div>
-          <div class="toast-body text-white">
-            ${message}
-          </div>
-        `;
-
-        notification.appendChild(toast);
-
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-          toast.remove();
-        }, 5000);
-      }
-
-      function fetchVotes() {
-        fetch("/get_votes")
-          .then((response) => response.json())
-          .then((votes) => {
-            updateVotingOptions(votes);
-            updateVotingDisplay(votes);
-          });
-      }
-
-      // Add this to the existing socket event listeners in index.html
-      socket.on("participant_removed", function (data) {
-        console.log("Participant removed event received:", data);
-
-        // Get current user ID either from session template variable or localStorage backup
-        const currentUserId =
-          "{{ session.get('voter_id', '') }}" ||
-          localStorage.getItem("current_voter_id");
-        console.log("Current user ID:", currentUserId, "Removed ID:", data.id);
-
-        // Store voter_id in localStorage as backup when socket connects
-        if (
-          !localStorage.getItem("current_voter_id") &&
-          "{{ session.get('voter_id', '') }}"
-        ) {
-          localStorage.setItem(
-            "current_voter_id",
-            "{{ session.get('voter_id', '') }}"
-          );
-        }
-
-        // Use == for loose comparison since types might differ (string vs number)
-        if (data.id == currentUserId || data.id === currentUserId) {
-          console.log("Current user was removed - redirecting to access page");
-
-          // Show notification that the user has been removed
-          showNotification(
-            "Your access to this event has been revoked by an administrator",
-            "warning"
-          );
-
-          // Clear local storage
-          localStorage.removeItem("current_voter_id");
-
-          // Immediate redirect with a brief delay
-          setTimeout(function () {
-            window.location.href = "/event-access";
-          }, 2000);
-        }
-      });
-
       // Add these event listeners with your other socket listeners in index.html
       socket.on("contestant_added", function (data) {
         console.log("New contestant added:", data.name);
@@ -988,6 +1007,64 @@
         }
       });
 
+      // Add this to index.html socket listeners
+      socket.on("winners_revealed", function (data) {
+        console.log("Winners revealed:", data);
+        showNotification(
+          "The results are in! Winners are being announced!",
+          "success"
+        );
+
+        // Show vote counts
+        document.querySelectorAll(".vote-count").forEach((el) => {
+          const option = el.closest(".card").dataset.option;
+          const count = data.all_votes[option] || 0;
+          el.textContent = `Votes: ${count}`;
+        });
+
+        // Create winners announcement
+        const winnersDiv = document.createElement("div");
+        winnersDiv.className = "winners-announcement";
+
+        let winnersHTML = "<h2>🏆 WINNERS 🏆</h2>";
+
+        // First place
+        if (data.first) {
+          winnersHTML += `
+            <div class="winner first-place">
+              <div class="medal">🥇</div>
+              <div class="winner-name">${data.first[0]}</div>
+              <div class="winner-votes">${data.first[1]} votes</div>
+            </div>`;
+        }
+
+        // Second place
+        if (data.second) {
+          winnersHTML += `
+            <div class="winner second-place">
+              <div class="medal">🥈</div>
+              <div class="winner-name">${data.second[0]}</div>
+              <div class="winner-votes">${data.second[1]} votes</div>
+            </div>`;
+        }
+
+        // Third place
+        if (data.third) {
+          winnersHTML += `
+            <div class="winner third-place">
+              <div class="medal">🥉</div>
+              <div class="winner-name">${data.third[0]}</div>
+              <div class="winner-votes">${data.third[1]} votes</div>
+            </div>`;
+        }
+
+        winnersDiv.innerHTML = winnersHTML;
+        document.body.appendChild(winnersDiv);
+
+        // Play celebration sound
+        playSound();
+      });
+
       // Add this to your JavaScript section
       function setupSearch() {
         const searchInput = document.getElementById("search-options");
@@ -1036,6 +1113,129 @@
           filterOptions();
           searchInput.focus();
         }
+      }
+
+      // Add this socket event handler in index.html
+      socket.on("winners_revealed", function (data) {
+        console.log("Winners revealed:", data);
+        showNotification(
+          "The results are in! Winners are being announced!",
+          "success"
+        );
+
+        // Dramatic pause with countdown for effect
+        showCountdown(3, function () {
+          revealWinners(data);
+        });
+      });
+
+      function showCountdown(seconds, callback) {
+        const countdownDiv = document.createElement("div");
+        countdownDiv.className = "winner-countdown";
+        countdownDiv.innerHTML = `<h2>Results in ${seconds}</h2>`;
+        document.body.appendChild(countdownDiv);
+
+        const interval = setInterval(() => {
+          seconds--;
+          if (seconds > 0) {
+            countdownDiv.innerHTML = `<h2>Results in ${seconds}</h2>`;
+          } else {
+            clearInterval(interval);
+            countdownDiv.remove();
+            callback();
+          }
+        }, 1000);
+      }
+
+      function revealWinners(data) {
+        // Reveal all vote counts first
+        const voteCountElements = document.querySelectorAll(".vote-count");
+        voteCountElements.forEach((el) => {
+          const count = el.dataset.count;
+          el.textContent = `Votes: ${count}`;
+        });
+
+        // Create and show winners announcement
+        const winnersDiv = document.createElement("div");
+        winnersDiv.className = "winners-announcement";
+
+        let winnersHTML = "<h2>🏆 WINNERS 🏆</h2>";
+
+        // Add first place with gold medal
+        if (data.first) {
+          winnersHTML += `
+            <div class="winner first-place">
+              <div class="medal">🥇</div>
+              <div class="winner-name">${data.first[0]}</div>
+              <div class="winner-votes">${data.first[1]} votes</div>
+            </div>
+          `;
+
+          // Highlight the winner in the voting display
+          const winnerCard = document.querySelector(
+            `.card[data-option="${data.first[0]}"]`
+          );
+          if (winnerCard)
+            winnerCard.classList.add("winner-card", "first-place");
+        }
+
+        // Add second place with silver medal
+        if (data.second) {
+          winnersHTML += `
+            <div class="winner second-place">
+              <div class="medal">🥈</div>
+              <div class="winner-name">${data.second[0]}</div>
+              <div class="winner-votes">${data.second[1]} votes</div>
+            </div>
+          `;
+
+          const secondPlaceCard = document.querySelector(
+            `.card[data-option="${data.second[0]}"]`
+          );
+          if (secondPlaceCard)
+            secondPlaceCard.classList.add("winner-card", "second-place");
+        }
+
+        // Add third place with bronze medal
+        if (data.third) {
+          winnersHTML += `
+            <div class="winner third-place">
+              <div class="medal">🥉</div>
+              <div class="winner-name">${data.third[0]}</div>
+              <div class="winner-votes">${data.third[1]} votes</div>
+            </div>
+          `;
+
+          const thirdPlaceCard = document.querySelector(
+            `.card[data-option="${data.third[0]}"]`
+          );
+          if (thirdPlaceCard)
+            thirdPlaceCard.classList.add("winner-card", "third-place");
+        }
+
+        winnersDiv.innerHTML = winnersHTML;
+        document.body.appendChild(winnersDiv);
+
+        // Add celebration effects
+        createConfetti();
+
+        // Play celebration sound
+        const audio = new Audio(
+          "https://www.myinstants.com/media/sounds/ta-da.mp3"
+        );
+        audio.volume = 0.5;
+        audio
+          .play()
+          .catch((e) => console.log("Audio couldn't play automatically"));
+
+        // Add close button after a delay
+        setTimeout(() => {
+          const closeButton = document.createElement("button");
+          closeButton.className = "btn btn-primary mt-3";
+          closeButton.textContent = "Close";
+          closeButton.onclick = () => winnersDiv.remove();
+          winnersDiv.appendChild(closeButton);
+        }, 5000);
       }
     </script>
   </body>
